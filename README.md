@@ -39,37 +39,64 @@ Abre `http://localhost:8000/`. También puedes usar Live Server de Visual Studio
 
 ## Archivos que puedes editar
 
-- `index.html` e `inicio.css`: portada de los dos juegos.
-- `lider/` y `tribunal/`: proyectos estáticos independientes. Cada carpeta incluye `index.html`, `game.css`, `game.js`, `story.js` y `scene.png`.
-- `story.js`: historias, alternativas, consecuencias, rutas y presentación del rol.
-- `game.js`: interfaz, sellos, credencial, guardado local y reflexión para desbloquear recompensas.
-- `game.css`: estilo visual, adaptación a pantallas pequeñas e impresión.
-- `.nojekyll`: desactiva el procesamiento Jekyll. Consérvalo si subes el proyecto con Git.
+- `index.html` e `inicio.css`: portada de los dos juegos (los números 10 capítulos / 10 sellos / 1000 XP están escritos a mano aquí).
+- `lider/` y `tribunal/`: proyectos estáticos independientes (`index.html`, `game.css`, `game.js`, `story.js`, `scene.png`).
+- `story.js` (distinto en cada juego): todo el contenido en `window.GAME`: textos, capítulos, escenas, alternativas, puntos, efectos sobre las variables, ejes del cierre y desenlaces. **El número de capítulos y el máximo de puntos salen de `chapters.length`** (máximo = capítulos × 100).
+- `game.js` (idéntico en ambas carpetas; si lo cambias, cópialo a la otra): interfaz, sellos, reflexión, guardado, credencial.
+- `tests_check.js`: verificación estructural y de flujo. Ejecuta `node tests_check.js` (solo Node, sin dependencias).
+- `.nojekyll`: consérvalo si subes con Git.
+
+## Cómo funciona la historia ampliada
+
+- Diez capítulos por juego = diez decisiones por partida. Cada capítulo tiene una o varias escenas; la escena que ves depende de tus decisiones y de las variables de estado (las rutas se reconectan, pero las variables recuerdan lo ocurrido). Los capítulos 4 a 9 tienen una escena «regular» y otra de «recuperación o tensión» según el estado.
+- Variables (recursos ficticios del juego, no mediciones psicológicas), de 0 a 6:
+  - Liderazgo: confianza, colaboración, sobrecarga, acuerdos vigentes.
+  - Tribunal: reserva pertinente, consulta con supervisión, comunicación con el adolescente, acciones pendientes.
+- Puntos: dependen solo de la alternativa elegida (máximo 100 por capítulo, 1000 por juego). El azar solo elige entre dos variantes de contexto (70 % / 30 %, probabilidades de diseño, no predicciones).
+- El desenlace combina puntos, número de decisiones débiles, decisiones críticas (0 puntos), recuperación en los capítulos finales y el estado de las variables; no depende solo de la suma. El cierre relaciona el recorrido con las cuatro dimensiones del liderazgo transformacional (Líder) o con cuatro ejes de criterio ético (Tribunal) y propone acciones concretas. No diagnostica ni es una prueba validada.
+
+### Capítulos de «Misión: líder transformacional»
+1 Abrir el diálogo · 2 Construir acuerdos · 3 Aprender juntos · 4 Equidad en las cargas · 5 Apertura al cambio · 6 Voces incluidas · 7 Integridad ante la presión · 8 Diálogo abierto · 9 Cuidado del equipo · 10 Huella sostenible.
+
+### Capítulos de «Tribunal de decisiones éticas»
+1 Recibir el relato · 2 Deliberar con criterio · 3 Fundamentar la actuación · 4 Información e incertidumbre · 5 Consulta supervisada · 6 Destinatarios de la información · 7 Documentar · 8 Comunicación con el adolescente · 9 Integridad institucional · 10 Seguimiento y revisión.
+
+El Tribunal distingue los hechos originales del caso (panel «Hechos originales del caso») de la información ficticia añadida (recuadro morado «Información añadida por la simulación»).
+
+## Sellos, reflexión y credencial
+
+- Diez sellos por juego. Con 100 puntos el sello se reclama directamente; con menos hay que escribir una reflexión (mínimo 40 caracteres y 8 palabras; es una comprobación de extensión, no de calidad) y no cambia la puntuación. La pregunta de reflexión es propia de cada capítulo y muestra tu decisión.
+- Un solo punto del código marca un sello como reunido y exige la reflexión. La credencial exige los diez sellos.
+- El texto del estudiante se muestra siempre con `textContent`.
+
+## Guardado y compatibilidad
+
+- Clave `tutoria8-<juego>-v2`, independiente por juego. Se guarda solo el historial de decisiones (escena, alternativa, variante, sello reclamado, reflexión); puntos, variables y progreso se recalculan y se validan contra la historia. Si el guardado no coincide con la historia (por ejemplo, tras editar `story.js`), se rechaza.
+- Las partidas antiguas de tres capítulos (`…-visual-v1`) no son compatibles: el juego avisa y ofrece empezar una nueva. **No se borran hasta que la persona confirma** «Reiniciar».
 
 ## Funciones incluidas
 
-- Historias de tres capítulos con ramificaciones según las decisiones.
-- Alternativas con orden aleatorio y consecuencias contextuales de simulación.
-- Puntos vinculados a la decisión, no al azar.
-- Colección de tres sellos y credencial simbólica imprimible.
-- Reflexión escrita cuando una decisión obtiene menos de 100 puntos: mínimo 40 caracteres y 8 palabras. Se verifica la extensión, no el significado ni la calidad del texto.
-- Guardado del avance y las reflexiones en el navegador, por separado para cada juego.
-- Introducción de rol y enfoque antes de empezar; confirmación antes de reiniciar.
+- Introducción de rol, alternativas en orden aleatorio, consecuencias contextuales, bitácora de decisiones, credencial simbólica imprimible, confirmación antes de reiniciar.
+- Duración estimada: 35–50 minutos. **Es una estimación pendiente de pilotaje** (ya no se promete 5–7 minutos).
 
 ## Datos y condiciones de uso
 
-El proyecto no incluye servicios de autenticación, analítica ni envío de información. En GitHub Pages los enlaces no pedirán iniciar sesión con ChatGPT. El código y las imágenes están incluidos; no dependen de los enlaces privados usados durante el desarrollo.
+El proyecto no incluye servicios de autenticación, analítica ni envío de información. Las reflexiones y la partida se conservan en `localStorage`, en ese navegador y dispositivo; no se envían a la docente. No incluyas datos personales reales. Borrar los datos del navegador o reiniciar elimina ese avance.
 
-Las reflexiones y la partida se conservan en `localStorage`, en ese navegador y dispositivo. No se envían a la docente ni se comparten con otros estudiantes. No incluyas datos personales reales. Borrar los datos del navegador o reiniciar una partida elimina ese avance. Al pasar de las versiones anteriores a GitHub Pages, el progreso no se transfiere porque cambia el origen del sitio.
+Las situaciones son ficticias y la credencial es simbólica, no una certificación profesional. El juego no sustituye la valoración ni el acompañamiento profesional. La capacidad para 400 participantes simultáneos no ha sido validada con una prueba de carga.
 
-Las situaciones son ficticias y la credencial es simbólica, no una certificación profesional. Las rutas éticas requieren revisión académica del contexto y protocolo institucional. El contenido toma como referencia las leyes colombianas 1090 y 1098 de 2006; el juego no sustituye la valoración ni el acompañamiento profesional.
+## Verificaciones realizadas
 
-La aplicación es estática y no usa un tablero compartido ni servidor de resultados. La capacidad para 400 participantes simultáneos no ha sido validada con una prueba de carga.
+Ejecutadas con `node tests_check.js` (simula el motor con un DOM falso, no un navegador):
+- Recorrido de las 59 049 rutas posibles por juego: todas terminan tras exactamente 10 decisiones, sin escenas inexistentes ni inalcanzables; probabilidades suman 100; puntos 0–100 por decisión; la ruta perfecta suma 1000.
+- Segunda respuesta ignorada (sin doble puntuación); sello bloqueado sin reflexión o con reflexión insuficiente; recarga con sello pendiente y tras reclamarlo; credencial bloqueada sin diez sellos; partida alterada rechazada; partida v1 detectada sin borrarla; claves separadas por juego.
 
-## Verificaciones realizadas en esta entrega
+**Pendiente (no ejecutado):** prueba visual en navegador real y en celular (la colección de diez sellos usa CSS grid adaptable, sin revisar visualmente), impresión de la credencial, funcionamiento desde las URL publicadas en GitHub Pages, y pilotaje con estudiantes para la duración.
 
-- Sintaxis JavaScript y referencias relativas a archivos locales.
-- Conservación de historias y reflexión de las versiones publicadas.
-- Separación de datos por juego; ausencia de credenciales, Git interno y configuración privada de Sites en el ZIP.
+## Pendientes de revisión académica (normativa)
 
-Publicar en tu cuenta de GitHub y revisar la URL final queda pendiente de que subas los archivos. Esta entrega no crea un repositorio ni modifica tu cuenta.
+La verificación en fuente oficial no fue posible (los sitios del Senado y de Función Pública no respondieron durante la elaboración). Por eso el Tribunal **solo nombra la Ley 1090 de 2006 y la Ley 1098 de 2006, sin citar artículos**, y evita afirmar rutas, autoridades o excepciones específicas. Debe revisar la docente, contra el texto oficial:
+- Alcance y excepciones de la reserva profesional del psicólogo (Ley 1090) aplicables a un practicante.
+- Deberes de reporte y autoridad competente ante posible maltrato de niños, niñas y adolescentes (Ley 1098) y cómo se concretan en el protocolo de una fundación.
+- Qué debe contener un registro y quién puede acceder, según la normativa y el protocolo institucional.
+- Que el caso ficticio de la «coordinadora de reemplazo», la llamada de un familiar y la presión de la dirección sean coherentes con las rutas reales.

@@ -1,44 +1,153 @@
-const gameKey=document.body.dataset.game;
-const config=gameKey==='lead'?{title:'Misión: líder transformacional',icon:'✦',subtitle:'El liderazgo deja huella',intro:'Un equipo desmotivado. Un proyecto por recuperar. Tres decisiones que pueden cambiar la forma de trabajar juntos.',guide:'Tu brújula será la escucha, la coherencia y la capacidad de construir con otros.',chapters:['Abrir el diálogo','Construir acuerdos','Dejar una huella'],seals:['Escucha','Colaboración','Aprendizaje'],symbols:['◉','❖','✦'],credential:'Huella de liderazgo',journey:'Tu bitácora de liderazgo'}:{title:'Tribunal de decisiones éticas',icon:'⚖',subtitle:'El criterio se construye',intro:'Un relato sensible. Principios en tensión. Tres decisiones para cuidar los derechos y fundamentar tu actuación profesional.',guide:'Tu brújula será la confidencialidad, la protección y la responsabilidad dentro del rol supervisado.',chapters:['Recibir el relato','Deliberar con criterio','Fundamentar la actuación'],seals:['Escucha ética','Deliberación','Responsabilidad'],symbols:['◈','⚖','✧'],credential:'Compromiso con el criterio ético',journey:'Tu expediente de aprendizaje'};
-current=gameKey;
-const saveKey='tutoria8-'+gameKey+'-visual-v1';
+// Motor compartido (idéntico en lider/ y tribunal/). El contenido vive en story.js (window.GAME).
+// Se guarda solo el historial de decisiones; puntos, variables, escena y progreso se derivan de la historia.
+const G=window.GAME,N=G.chapters.length,PER=100,MAX=N*PER,LOW=70,VMAX=6,MIN_CH=40,MIN_WORDS=8;
+const saveKey='tutoria8-'+G.id+'-v2',oldKey='tutoria8-'+G.id+'-visual-v1';
 const main=document.getElementById('main');
-document.title=config.title;document.getElementById('brand-title').textContent=config.title;document.getElementById('brand-icon').textContent=config.icon;
-let storageWorks=true;
-function save(){try{localStorage.setItem(saveKey,JSON.stringify(run));}catch{storageWorks=false;}}
-function restore(){try{const data=JSON.parse(localStorage.getItem(saveKey));if(data&&stories[gameKey].nodes[data.node]&&Array.isArray(data.history)&&data.history.length<=3&&data.history.every(h=>stories[gameKey].nodes[h.node])&&Number.isFinite(data.score))return data;if(data?.node==='fin'&&data.history?.length===3)return data;}catch{}return null;}
-run=restore();
-function fresh(){run={node:stories[gameKey].start,history:[],score:0,pending:null};save();}
-function header(){document.getElementById('xp').textContent='★ '+(run?.score||0)+' XP';document.getElementById('seals').textContent=(run?.history?.filter(h=>h.collected).length||0)+'/3 sellos';}
+document.title=G.title;document.getElementById('brand-title').textContent=G.title;document.getElementById('brand-icon').textContent=G.icon;
+let storageWorks=true,run=null,d=null,incompatible=false;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clamp=v=>Math.max(0,Math.min(VMAX,v));
+
+/* ---------- estado derivado ---------- */
+function pickScene(ch,st,prevOpt){const c=G.chapters[ch];return c.pick?c.pick(st):(prevOpt?.to||Object.keys(c.scenes)[0]);}
+// Devuelve null si el historial no es coherente con la historia actual.
+function derive(history){
+  let st={...G.vars},score=0,prev=null;const items=[];
+  for(let i=0;i<history.length;i++){
+    const h=history[i],c=G.chapters[i];if(!c||!h||typeof h.scene!=='string')return null;
+    if(pickScene(i,st,prev)!==h.scene)return null;
+    const o=c.scenes[h.scene]?.options[h.selected];if(!o||!(h.variant===0||h.variant===1))return null;
+    if(i<history.length-1&&!h.collected)return null; // solo el último puede estar sin reclamar
+    if(h.collected&&o.score<PER&&!validReflection(h.reflection))return null;
+    for(const k in o.fx)st[k]=clamp(st[k]+o.fx[k]);
+    score+=o.score;prev=o;
+    items.push({i,h,o,c,title:c.title,scene:c.scenes[h.scene],event:o.ev[h.variant],score:o.score,st:{...st}});
+  }
+  const last=items.at(-1),pending=!!last&&!last.h.collected,ch=history.filter(h=>h.collected).length;
+  const node=ch<N?pickScene(ch,st,pending?null:prev):null;
+  return{st,score,items,pending,ch,node,done:ch>=N};
+}
+function save(){try{localStorage.setItem(saveKey,JSON.stringify({v:2,history:run.history}));}catch{storageWorks=false;}}
+function load(){
+  let raw=null;try{raw=localStorage.getItem(saveKey);}catch{}
+  if(raw){try{const x=JSON.parse(raw);if(x?.v===2&&Array.isArray(x.history)&&x.history.length<=N){const dd=derive(x.history);if(dd){run={history:x.history};d=dd;return;}}}catch{}incompatible=true;return;}
+  try{if(localStorage.getItem(oldKey))incompatible=true;}catch{}
+}
+function fresh(){run={history:[]};d=derive([]);incompatible=false;save();}
+const count=()=>d?d.items.filter(x=>x.h.collected).length:0;
+
+/* ---------- vistas ---------- */
+function header(){document.getElementById('xp').textContent='★ '+(d?.score||0)+' XP';document.getElementById('seals').textContent=count()+'/'+N+' sellos';}
 function view(html){main.innerHTML=html+'<p class="footer">Tutoría 8 · Psicología · Experiencia formativa. Los personajes y situaciones adicionales son ficticios.</p>';header();window.scrollTo({top:0,behavior:'instant'});main.focus({preventScroll:true});}
-function stamps(){return `<div class="stamp-grid">${config.seals.map((s,i)=>{const h=run?.history?.[i];return `<div class="stamp ${h?.collected?'earned':''}"><b aria-hidden="true">${h?.collected?config.symbols[i]:'◇'}</b>${s}<span>${h?.collected?'Sello reunido':'Por descubrir'}</span></div>`;}).join('')}</div>`;}
-function credential(full=false){const count=run?.history.filter(h=>h.collected).length||0;return `<div class="${full?'credential':'credential-preview'}"><p class="kicker">${full?'Credencial simbólica de aprendizaje':'Tu recompensa final'}</p><h${full?'2':'3'}>${config.credential}</h${full?'2':'3'}><p>${count}/3 sellos reunidos</p>${full?stamps():'<p class="muted">Cada capítulo añade una pieza a tu credencial.</p>'}${full?'<small>Recorrido completado · Tutoría 8 · Prácticas Profesionales de Psicología</small><small>Reconocimiento del proceso de aprendizaje. No certifica competencias ni habilita el ejercicio profesional.</small>':''}</div>`;}
-function landing(){const active=run?.history?.length||run?.pending;view(`<section class="panel hero"><img src="scene.png" alt="${gameKey==='lead'?'Equipo que conversa sobre un proyecto comunitario':'Practicante y supervisora que revisan un caso con reserva'}"><div class="hero-copy"><p class="kicker">Una historia. Tu propio recorrido.</p><h1>${config.subtitle}</h1><p>${config.intro}</p><div class="buttons"><button onclick="begin()">${active?'Continuar mi partida':'Aceptar la misión'} →</button><button class="secondary" onclick="dashboard()">Explorar mi ruta</button></div><p><small>3 capítulos · decisiones ramificadas · 3 sellos</small></p></div></section><section class="panel intro-strip"><div><p class="kicker">Un propósito compartido</p><h2>${config.title}</h2><p>${config.guide}</p></div><div style="min-width:220px">${credential()}</div></section>`);}
-function begin(){if(!run)fresh();if(run.history.length||run.pending||run.node==='fin'){dashboard();return;}showIntroduction(gameKey);}
-// Existing introduction is retained; its start button calls the current renderer.
-openGame=function(){if(!run)fresh();begin();};
-function dashboard(){const hs=run?.history||[],done=hs.filter(h=>h.collected).length;view(`<section class="panel"><p class="kicker">${config.journey}</p><h1 style="font-size:34px">Tu ruta de decisiones</h1><p>Cada capítulo se abre con las consecuencias de lo que elegiste. Reúne los tres sellos y construye tu credencial.</p><div class="grid">${config.chapters.map((title,i)=>{const h=hs[i],can=run&&run.node!=='fin'&&i===hs.length;return `<article class="tile ${can?'active':''} ${i>hs.length?'locked':''}"><span class="num">${h?.collected?'✓':i>hs.length?'⌑':i+1}</span><h3>${title}</h3><p>${h?(h.collected?'Capítulo completado. Tu decisión dejó una huella.':'Tu sello está esperando ser revelado.'):i>hs.length?'Se abre después del capítulo anterior.':run?'Listo para continuar tu historia.':'Disponible al aceptar la misión.'}</p><button ${i>hs.length?'disabled':''} onclick="${h?(h.collected?`reviewChapter(${i})`:`revealReward(${i})`):run?'question()':'begin()'}">${h?(h.collected?'Revisar mi huella':'Revelar sello'):i>hs.length?'Bloqueado':'Explorar'} ${i>hs.length?'':'→'}</button></article>`;}).join('')}</div></section><div class="row"><section class="panel"><p class="kicker">Tu colección</p><h2>Sellos de aprendizaje</h2>${stamps()}<small>Se consiguen al revisar las consecuencias de cada capítulo. Un sello reconoce el recorrido, incluso cuando hay aspectos por fortalecer.</small></section><section class="panel"><p class="kicker">Una meta que toma forma</p>${credential()}<div class="buttons"><button ${done<3?'disabled':''} onclick="finish()">${done<3?'Reúne los tres sellos':'Abrir mi credencial'} →</button></div></section></div>${!storageWorks?'<p class="footer">Este navegador no permite guardar el avance al cerrar la página.</p>':''}`);}
-question=function(){if(!run)fresh();if(run.node==='fin'){finish();return;}if(run.pending){renderChapter();renderFeedback();return;}renderChapter();};
-function renderChapter(){const scene=stories[gameKey].nodes[run.node],index=run.pending?run.history.length-1:run.history.length,last=run.history[index-1],options=shuffledOptions(scene.options);view(`<div class="scene-layout"><section class="panel"><p class="kicker">Capítulo ${index+1} de 3 · ${config.chapters[index]}</p><div class="progress" aria-label="${index} capítulos completados"><i style="width:${index/3*100}%"></i></div><img class="chapter-art" src="scene.png" alt="Escenario ilustrado del juego">${last?`<div class="context"><strong>Lo que trajiste hasta aquí</strong><p>${last.event[0]}</p><p>${last.event[1]}</p></div>`:''}<h1 style="font-size:32px">${scene.title}</h1><p>${scene.text}</p><div id="choices">${options.map(({option:o,index},i)=>`<button class="choice" data-option="${index}" onclick="answer(${index})"><span class="letter">${'ABC'[i]}</span><span>${o.text}</span></button>`).join('')}</div><div id="feedback"></div></section><aside class="panel aside"><p class="kicker">Tu credencial en construcción</p><h3>Una huella por capítulo</h3>${stamps()}<button class="secondary" onclick="dashboard()">← Mi ruta</button></aside></div>`);}
-answer=function(choice){if(run.pending)return;const scene=stories[gameKey].nodes[run.node],o=scene.options[choice],variant=Math.random()<.7?0:1;run.score+=o.score;run.history.push({node:run.node,title:scene.title,choice:o.text,effect:o.effect,event:o.variants[variant],next:o.next,score:o.score,why:o.why,variant,collected:false,selected:choice});run.pending=o.next;save();renderFeedback();header();};
-function renderFeedback(){const h=run.history.at(-1);document.querySelectorAll('.choice').forEach(b=>{b.disabled=true;if(Number(b.dataset.option)===h.selected)b.classList.add('chosen',...(h.score<70?['review']:[]));});document.getElementById('feedback').innerHTML=`<div class="feedback ${h.score<70?'warn':''}"><p class="kicker">${h.score>=70?'Decisión fundamentada':'Una oportunidad para replantear'} · +${h.score} XP</p><h3>Tu historia acaba de cambiar</h3><p>${h.event[0]}</p><p><strong>Nuevo contexto:</strong> ${h.event[1]}</p><p><strong>Aprendizaje:</strong> ${h.why}</p><details><summary>Sobre el azar de esta escena</summary><small>Dos variantes de contexto: 70 % y 30 %. Son valores de diseño, no predicciones sobre personas. Los puntos dependen de tu decisión.</small></details><div class="buttons"><button onclick="revealReward(${run.history.length-1})">✦ Revelar mi sello</button></div></div>`;document.getElementById('feedback').scrollIntoView({behavior:'smooth',block:'nearest'});}
-function revealReward(i){const h=run.history[i],dialog=document.getElementById('reward');dialog.innerHTML=`<div class="sparkles" aria-hidden="true">✧ ✦ ✧</div><div class="award" aria-hidden="true">${config.symbols[i]}</div><p class="kicker">Una pieza más de tu recorrido</p><h2 id="reward-title">Sello de ${config.seals[i]}</h2><p>Completaste el capítulo ${i+1} y revisaste sus consecuencias.</p><div class="journal"><strong>${h.score>=70?'Criterio puesto en práctica':'Criterio para seguir fortaleciendo'}</strong><p>${h.why}</p></div><p>Este sello se incorpora a tu credencial de aprendizaje.</p><button onclick="collectReward(${i})">${h.collected?'Volver a mi ruta':'Añadir a mi credencial'} →</button>`;dialog.showModal();}
-function collectReward(i){const h=run.history[i];h.collected=true;document.getElementById('reward').close();document.getElementById('live').textContent='Sello de '+config.seals[i]+' añadido a tu colección.';if(run.pending){run.node=run.pending;run.pending=null;}save();dashboard();}
-next=function(){revealReward(run.history.length-1);};
-function reviewChapter(i){const h=run.history[i],dialog=document.getElementById('reward');dialog.innerHTML=`<p class="kicker">Capítulo ${i+1} · Tu huella</p><h2 id="reward-title">${h.title}</h2><div class="journal"><strong>Elegiste</strong><p>${h.choice}</p><strong>Lo que ocurrió</strong><p>${h.event[0]}</p><p>${h.event[1]}</p><strong>Aprendizaje</strong><p>${h.why}</p></div><button onclick="document.getElementById('reward').close()">Volver a mi ruta</button>`;dialog.showModal();}
-finish=function(){if(run?.history.filter(h=>h.collected).length!==3){dashboard();return;}const history=run.history,last=history.at(-1),recovered=history.slice(0,-1).some(h=>h.score<70)&&last.score>=70;const title=recovered?'Una oportunidad de recuperación':last.score<70?'Un cierre con asuntos pendientes':run.score>=270?'Un proceso construido con criterio':'Un avance que necesita seguimiento';view(`<section class="panel"><p class="kicker">Desenlace de tu historia</p><h1>${title}</h1><p>${last.event[0]} ${last.event[1]}</p></section><div class="final-grid"><section class="panel"><p class="kicker">La huella de tus decisiones</p><h2>${run.score} XP · Tres capítulos vividos</h2>${history.map((h,i)=>`<div class="journal"><strong>${i+1}. ${h.title}</strong><p>Elegiste: ${h.choice}</p><p>${h.effect}</p><small>${h.why}</small></div>`).join('')}<p>¿Qué cambiarías al vivir otra vez esta historia? ¿Qué consultarías con tu supervisor?</p><div class="buttons"><button class="secondary" onclick="dashboard()">Mi colección</button><button onclick="confirmRestart()">Explorar otra ruta</button></div></section><section class="panel"><div id="credential-area">${credential(true)}</div><div class="buttons"><button onclick="printCredential()">Imprimir mi credencial</button></div><small>Puedes guardarla como PDF desde el diálogo de impresión del navegador.</small></section></div>`);}
-function printCredential(){const old=document.getElementById('print-wrapper');if(old)old.remove();const wrapper=document.createElement('div');wrapper.id='print-wrapper';wrapper.style.display='none';wrapper.innerHTML=credential(true);main.appendChild(wrapper);window.print();}
-function confirmRestart(){if(!run){fresh();showIntroduction(gameKey);return;}document.getElementById('restart').showModal();}
-function restartGame(){document.getElementById('restart').close();fresh();showIntroduction(gameKey);}
-function validReflection(text){const clean=(text||'').trim();return clean.length>=40&&clean.split(/\s+/).length>=8;}
-function reflectionRequired(h){return h.score<100&&!validReflection(h.reflection);}
-const revealWithoutReflection=revealReward;
-revealReward=function(i){const h=run.history[i];if(reflectionRequired(h)){showReflection(i);return;}revealWithoutReflection(i);};
-const collectWithoutReflection=collectReward;
-collectReward=function(i){if(reflectionRequired(run.history[i])){showReflection(i);return;}collectWithoutReflection(i);};
-function showReflection(i){const h=run.history[i],dialog=document.getElementById('reward');dialog.innerHTML=`<div class="award" aria-hidden="true">✎</div><p class="kicker">Una pausa para aprender</p><h2 id="reward-title">Reflexiona para liberar tu sello</h2><p>Tu decisión obtuvo ${h.score} de 100 XP. Puedes transformar lo ocurrido en aprendizaje antes de recoger el sello.</p><div class="journal"><strong>Un criterio para tu reflexión</strong><p>${h.why}</p></div><form id="reflection-form"><label for="reflection-text" style="display:block;text-align:left;font-weight:750">¿Qué cambiarías de tu decisión y por qué? ${gameKey==='lead'?'Piensa en el efecto sobre el equipo y en una dimensión del liderazgo transformacional.':'Piensa en los principios éticos, los derechos y el rol supervisado.'}</label><textarea id="reflection-text" rows="5" maxlength="1500" aria-describedby="reflection-help reflection-count" required style="display:block;width:100%;margin:14px 0;padding:13px;border:2px solid var(--line);border-radius:12px;font:inherit;resize:vertical;color:var(--ink);background:white"></textarea><p id="reflection-help" style="font-size:13px;text-align:left">Escribe una reflexión breve: al menos 40 caracteres y 8 palabras. No incluyas nombres ni datos de personas reales. Se guarda solo en este navegador; no se envía a la docente ni se evalúa automáticamente su contenido.</p><p id="reflection-count" aria-live="polite" style="font-size:13px"></p><button id="reflection-submit" type="submit" disabled>Guardar reflexión y liberar sello →</button></form>`;const field=dialog.querySelector('#reflection-text'),button=dialog.querySelector('#reflection-submit'),count=dialog.querySelector('#reflection-count');field.value=h.reflection||'';const update=()=>{h.reflection=field.value;save();const words=field.value.trim()?field.value.trim().split(/\s+/).length:0;button.disabled=!validReflection(field.value);count.textContent=button.disabled?`${field.value.trim().length}/40 caracteres mínimos · ${words}/8 palabras mínimas`:'Tu reflexión está lista para guardarse.';};field.addEventListener('input',update);dialog.querySelector('#reflection-form').addEventListener('submit',e=>{e.preventDefault();if(!validReflection(field.value)){field.focus();return;}h.reflection=field.value.trim();save();dialog.close();revealWithoutReflection(i);});update();if(!dialog.open)dialog.showModal();field.focus();}
-const reviewWithoutReflection=reviewChapter;
-reviewChapter=function(i){reviewWithoutReflection(i);const h=run.history[i];if(h.reflection){const p=document.createElement('p');p.style.cssText='text-align:left;white-space:pre-wrap;';p.textContent='Tu reflexión: '+h.reflection;document.getElementById('reward').querySelector('.journal').appendChild(p);}};
-const feedbackWithoutReflection=renderFeedback;
-renderFeedback=function(){feedbackWithoutReflection();const h=run.history.at(-1);if(h.score<100){const button=document.querySelector('#feedback .buttons button');if(button)button.textContent=reflectionRequired(h)?'✎ Reflexionar para liberar sello':'✦ Revelar mi sello';}};
-landing();
+function stamps(){return `<div class="stamp-grid">${G.seals.map((s,i)=>{const e=d?.items[i]?.h.collected;return `<div class="stamp ${e?'earned':''}"><b aria-hidden="true">${e?G.symbols[i]:'◇'}</b>${s}<span>${e?'Sello reunido':'Por descubrir'}</span></div>`;}).join('')}</div>`;}
+function credential(full=false){return `<div class="${full?'credential':'credential-preview'}"><p class="kicker">${full?'Credencial simbólica de aprendizaje':'Tu recompensa final'}</p><h${full?'2':'3'}>${G.credential}</h${full?'2':'3'}><p>${count()}/${N} sellos reunidos</p>${full?stamps():'<p class="muted">Cada capítulo añade una pieza a tu credencial.</p>'}${full?'<small>Recorrido completado · Tutoría 8 · Prácticas Profesionales de Psicología</small><small>Reconocimiento del proceso de aprendizaje. No certifica competencias ni habilita el ejercicio profesional.</small>':''}</div>`;}
+function meters(){const st=d?.st||G.vars;return `<div class="meters"><p class="kicker">Recursos de la simulación</p>${Object.entries(G.varLabels).map(([k,l])=>`<div class="meter"><span>${l}</span><b aria-label="${st[k]} de ${VMAX}">${'●'.repeat(st[k])}${'○'.repeat(VMAX-st[k])}</b></div>`).join('')}<small>Recursos ficticios del juego; no miden a personas ni son una medición psicológica.</small></div>`;}
+
+function landing(){
+  const active=run?.history.length>0;
+  view(`${incompatible?`<section class="panel notice" role="alert"><h2>Partida anterior no compatible</h2><p>Este navegador guarda una partida de una versión anterior (tres capítulos) o con datos que no coinciden con la versión actual de ${N} capítulos. No se ha borrado nada, pero no se puede continuar.</p><div class="buttons"><button onclick="confirmRestart()">Empezar una nueva partida</button></div></section>`:''}<section class="panel hero"><img src="scene.png" alt="${esc(G.alt)}"><div class="hero-copy"><p class="kicker">Una historia. Tu propio recorrido.</p><h1>${G.subtitle}</h1><p>${G.intro}</p><div class="buttons"><button onclick="begin()">${active?'Continuar mi partida':'Aceptar la misión'} →</button><button class="secondary" onclick="dashboard()">Explorar mi ruta</button></div><p><small>${N} capítulos · decisiones ramificadas · ${N} sellos · duración estimada ${G.minutes} (por confirmar con pilotaje)</small></p></div></section><section class="panel intro-strip"><div><p class="kicker">Un propósito compartido</p><h2>${G.title}</h2><p>${G.guide}</p></div><div class="strip-cred">${credential()}</div></section>`);
+}
+function begin(){if(incompatible){confirmRestart();return;}if(!run)fresh();if(run.history.length){dashboard();return;}showIntroduction();}
+function dashboard(){
+  const items=d?.items||[],done=count(),ch=d?.ch||0;
+  view(`<section class="panel"><p class="kicker">${G.journey}</p><h1 style="font-size:34px">Tu ruta de decisiones</h1><p>Cada capítulo se abre con las consecuencias de lo que elegiste. Reúne los ${N} sellos y construye tu credencial.</p><div class="grid">${G.chapters.map((c,i)=>{const it=items[i],collected=it?.h.collected,unclaimed=it&&!collected,current=d?(!d.done&&i===ch&&!unclaimed):i===0,locked=!it&&!current;
+    const txt=collected?'Capítulo completado. Tu decisión dejó una huella.':unclaimed?'Tu sello está esperando ser revelado.':current?'Listo para continuar tu historia.':locked?'Se abre después del capítulo anterior.':'';
+    const act=collected?`reviewChapter(${i})`:unclaimed?`revealReward(${i})`:d?'question()':'begin()';
+    return `<article class="tile ${current||unclaimed?'active':''} ${locked?'locked':''}"><span class="num">${collected?'✓':locked?'⌑':i+1}</span><h3>${c.title}</h3><p>${txt}</p><button ${locked?'disabled':''} ${locked?'':`onclick="${act}"`}>${collected?'Revisar mi huella':unclaimed?'Revelar sello':locked?'Bloqueado':'Explorar'} ${locked?'':'→'}</button></article>`;}).join('')}</div></section><div class="row"><section class="panel"><p class="kicker">Tu colección</p><h2>Sellos de aprendizaje</h2>${stamps()}<small>Un sello reconoce el recorrido, incluso cuando hay aspectos por fortalecer.</small></section><section class="panel"><p class="kicker">Una meta que toma forma</p>${credential()}${meters()}<div class="buttons"><button ${done<N?'disabled':''} onclick="finish()">${done<N?`Reúne los ${N} sellos`:'Abrir mi credencial'} →</button></div></section></div>${!storageWorks?'<p class="footer">Este navegador no permite guardar el avance al cerrar la página.</p>':''}`);
+}
+function question(){
+  if(!run)fresh();
+  if(d.done){finish();return;}
+  renderChapter();if(d.pending)renderFeedback();
+}
+function shuffled(options){const a=options.map((option,index)=>({option,index}));for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function renderChapter(){
+  const idx=d.pending?d.items.length-1:d.ch,c=G.chapters[idx],scene=c.scenes[d.pending?d.items[idx].h.scene:d.node],last=d.items[idx-1];
+  const st=d.pending?(d.items[idx-1]?.st||G.vars):d.st;
+  const ctx=(scene.ctx||[]).filter(([f])=>f(st)).slice(0,2).map(([,t])=>`<p>${t}</p>`).join('');
+  view(`<div class="scene-layout"><section class="panel"><p class="kicker">Capítulo ${idx+1} de ${N} · ${c.name}</p><div class="progress" role="img" aria-label="${idx} de ${N} capítulos completados"><i style="width:${idx/N*100}%"></i></div><img class="chapter-art" src="scene.png" alt="">${last?`<div class="context"><strong>Lo que trajiste hasta aquí</strong><p>${last.event[0]}</p><p>${last.event[1]}</p>${ctx}</div>`:''}<p class="tag">${c.focus}</p><h1 style="font-size:32px">${scene.title||c.title}</h1><p>${scene.text}</p>${scene.added?`<div class="added"><strong>Información añadida por la simulación (ficticia)</strong><p>${scene.added}</p></div>`:''}<div id="choices">${shuffled(scene.options).map(({option:o,index},i)=>`<button class="choice" data-option="${index}" onclick="answer(${index})"><span class="letter">${'ABC'[i]}</span><span>${o.text}</span></button>`).join('')}</div><div id="feedback"></div></section><aside class="panel aside"><p class="kicker">Tu credencial en construcción</p><h3>Una huella por capítulo</h3>${stamps()}${meters()}${G.facts?`<details class="facts"><summary>Hechos originales del caso</summary><ul>${G.facts.map(f=>`<li>${f}</li>`).join('')}</ul><small>Todo lo demás en la historia es información ficticia añadida por la simulación.</small></details>`:''}<button class="secondary" onclick="dashboard()">← Mi ruta</button></aside></div>`);
+}
+function answer(choice){
+  if(!run||d.pending||d.done)return; // evita puntuar dos veces
+  const c=G.chapters[d.ch],o=c.scenes[d.node].options[choice];if(!o)return;
+  const p=o.p||[70,30];
+  run.history.push({scene:d.node,selected:choice,variant:Math.random()*100<p[0]?0:1,collected:false});
+  d=derive(run.history);save();renderFeedback();header();
+}
+function renderFeedback(){
+  const it=d.items.at(-1),o=it.o,p=o.p||[70,30],good=it.score>=LOW;
+  document.querySelectorAll('.choice').forEach(b=>{b.disabled=true;if(Number(b.dataset.option)===it.h.selected)b.classList.add('chosen',...(good?[]:['review']));});
+  const need=needsReflection(it.h);
+  document.getElementById('feedback').innerHTML=`<div class="feedback ${good?'':'warn'}"><p class="kicker">${good?'Decisión fundamentada':'Una oportunidad para replantear'} · +${it.score} de ${PER} XP</p><h3>Tu historia acaba de cambiar</h3><p>${it.event[0]}</p><p><strong>Nuevo contexto:</strong> ${it.event[1]}</p><p><strong>Aprendizaje:</strong> ${o.why}</p><details><summary>Sobre el azar de esta escena</summary><small>Dos variantes de contexto con probabilidades de diseño: ${p[0]} % y ${p[1]} % (suman 100 %). No son predicciones sobre personas. Los puntos dependen solo de tu decisión.</small></details><div class="buttons"><button onclick="revealReward(${it.i})">${need?'✎ Reflexionar para liberar sello':'✦ Revelar mi sello'}</button></div></div>`;
+  document.getElementById('feedback').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+/* ---------- sellos y reflexión ---------- */
+function validReflection(t){const c=(t||'').trim();return c.length>=MIN_CH&&c.split(/\s+/).length>=MIN_WORDS;}
+function needsReflection(h){const it=d.items.find(x=>x.h===h);return it.score<PER&&!validReflection(h.reflection);}
+function revealReward(i){
+  const it=d.items[i];if(!it)return;
+  if(needsReflection(it.h)){showReflection(i);return;}
+  const dialog=document.getElementById('reward');
+  dialog.innerHTML=`<div class="sparkles" aria-hidden="true">✧ ✦ ✧</div><div class="award" aria-hidden="true">${G.symbols[i]}</div><p class="kicker">Una pieza más de tu recorrido</p><h2 id="reward-title">Sello de ${G.seals[i]}</h2><p>Completaste el capítulo ${i+1} y revisaste sus consecuencias.</p><div class="journal"><strong>${it.score>=LOW?'Criterio puesto en práctica':'Criterio para seguir fortaleciendo'}</strong><p>${it.o.why}</p></div><p>Este sello se incorpora a tu credencial de aprendizaje.</p><button onclick="claimSeal(${i})">${it.h.collected?'Volver a mi ruta':'Añadir a mi credencial'} →</button>`;
+  dialog.showModal();
+}
+// Única función que marca un sello como reunido.
+function claimSeal(i){
+  const dialog=document.getElementById('reward'),it=d.items[i];
+  if(!it||i!==d.items.length-1&&!it.h.collected)return;
+  if(!it.h.collected){
+    if(needsReflection(it.h)){showReflection(i);return;}
+    it.h.collected=true;save();d=derive(run.history);
+    document.getElementById('live').textContent='Sello de '+G.seals[i]+' añadido a tu colección.';
+  }
+  dialog.close();
+  if(d.done){finish();return;}
+  dashboard();
+}
+function showReflection(i){
+  const it=d.items[i],h=it.h,dialog=document.getElementById('reward');
+  dialog.innerHTML=`<div class="award" aria-hidden="true">✎</div><p class="kicker">Una pausa para aprender</p><h2 id="reward-title">Reflexiona para liberar tu sello</h2><p>Tu decisión obtuvo ${it.score} de ${PER} XP. Puedes transformar lo ocurrido en aprendizaje antes de recoger el sello. La reflexión no cambia tu puntuación.</p><div class="journal"><strong>Elegiste</strong><p>${it.o.text}</p><strong>Un criterio para tu reflexión</strong><p>${it.o.why}</p></div><form id="reflection-form"><label for="reflection-text" class="rlabel">${it.c.reflect}</label><textarea id="reflection-text" rows="5" maxlength="1500" aria-describedby="reflection-help reflection-count" required></textarea><p id="reflection-help">Escribe una reflexión breve: al menos ${MIN_CH} caracteres y ${MIN_WORDS} palabras. No incluyas nombres ni datos de personas reales. Se guarda solo en este navegador; no se envía a la docente ni se evalúa automáticamente su contenido.</p><p id="reflection-count" aria-live="polite"></p><button id="reflection-submit" type="submit" disabled>Guardar reflexión y liberar sello →</button></form>`;
+  const field=dialog.querySelector('#reflection-text'),button=dialog.querySelector('#reflection-submit'),cnt=dialog.querySelector('#reflection-count');
+  field.value=h.reflection||'';
+  const update=()=>{h.reflection=field.value;save();const t=field.value.trim(),w=t?t.split(/\s+/).length:0;button.disabled=!validReflection(field.value);cnt.textContent=button.disabled?`${t.length}/${MIN_CH} caracteres mínimos · ${w}/${MIN_WORDS} palabras mínimas`:'Tu reflexión está lista para guardarse.';};
+  field.addEventListener('input',update);
+  dialog.querySelector('#reflection-form').addEventListener('submit',e=>{e.preventDefault();if(!validReflection(field.value)){field.focus();return;}h.reflection=field.value.trim();save();revealReward(i);});
+  update();if(!dialog.open)dialog.showModal();field.focus();
+}
+function reviewChapter(i){
+  const it=d.items[i],dialog=document.getElementById('reward');
+  dialog.innerHTML=`<p class="kicker">Capítulo ${i+1} · Tu huella</p><h2 id="reward-title">${it.title}</h2><div class="journal"><strong>Elegiste</strong><p>${it.o.text}</p><strong>Lo que ocurrió</strong><p>${it.event[0]}</p><p>${it.event[1]}</p><strong>Aprendizaje</strong><p>${it.o.why}</p><div id="refl"></div></div><button onclick="document.getElementById('reward').close()">Volver a mi ruta</button>`;
+  if(it.h.reflection){const p=document.createElement('p');p.className='student';p.textContent='Tu reflexión: '+it.h.reflection; // textContent: texto del estudiante nunca como HTML
+    dialog.querySelector('#refl').appendChild(p);}
+  dialog.showModal();
+}
+
+/* ---------- desenlace ---------- */
+function outcome(){
+  const items=d.items,low=items.filter(x=>x.score<LOW).length,crit=items.filter(x=>x.score===0).length;
+  const last3=items.slice(-3).reduce((a,x)=>a+x.score,0)/3,early=items.slice(0,N-3).filter(x=>x.score<LOW).length;
+  const axes=G.axes.map(a=>{const v=a.chapters.map(i=>items[i].score),avg=v.reduce((x,y)=>x+y,0)/v.length;return{...a,avg};});
+  return G.ending({items,score:d.score,st:d.st,low,crit,last3,early,recovered:early>=2&&last3>=85,lastScore:items.at(-1).score,axes});
+}
+function finish(){
+  if(!d||d.items.filter(x=>x.h.collected).length!==N){dashboard();return;} // exige los N sellos
+  const e=outcome();
+  view(`<section class="panel"><p class="kicker">Desenlace de tu historia</p><h1>${e.title}</h1><p>${e.text}</p><p><small>${G.endingNote}</small></p></section><div class="final-grid"><section class="panel"><p class="kicker">La huella de tus decisiones</p><h2>${d.score} / ${MAX} XP · ${N} capítulos vividos</h2><h3>${G.axesTitle}</h3>${e.axes.map(a=>`<div class="journal"><strong>${a.label}: ${a.avg>=85?'visible en tu recorrido':'por fortalecer'}</strong><p>${a.action}</p></div>`).join('')}<h3>Bitácora</h3>${d.items.map((x,i)=>`<details class="journal"><summary><strong>${i+1}. ${x.title}</strong> · ${x.score} XP</summary><p>Elegiste: ${x.o.text}</p><p>${x.o.effect}</p><small>${x.o.why}</small>${x.h.reflection?'<p class="student" data-r="'+i+'"></p>':''}</details>`).join('')}<p>${G.closing}</p><div class="buttons"><button class="secondary" onclick="dashboard()">Mi colección</button><button onclick="confirmRestart()">Explorar otra ruta</button></div></section><section class="panel"><div id="credential-area">${credential(true)}</div><div class="buttons"><button onclick="printCredential()">Imprimir mi credencial</button></div><small>Puedes guardarla como PDF desde el diálogo de impresión del navegador.</small></section></div>`);
+  main.querySelectorAll('.student[data-r]').forEach(p=>{p.textContent='Tu reflexión: '+d.items[p.dataset.r].h.reflection;});
+}
+function printCredential(){document.getElementById('print-wrapper')?.remove();const w=document.createElement('div');w.id='print-wrapper';w.style.display='none';w.innerHTML=credential(true);main.appendChild(w);window.print();}
+
+/* ---------- reinicio e introducción ---------- */
+function confirmRestart(){if(!run&&!incompatible){fresh();showIntroduction();return;}document.getElementById('restart').showModal();}
+function restartGame(){document.getElementById('restart').close();try{localStorage.removeItem(oldKey);}catch{}fresh();showIntroduction();}
+function showIntroduction(){
+  document.getElementById('role-introduction')?.remove();
+  const x=G.introduction,dialog=document.createElement('dialog');dialog.id='role-introduction';dialog.setAttribute('aria-labelledby','intro-title');
+  dialog.innerHTML=`<div style="font-size:35px" aria-hidden="true">${x.icon}</div><p class="kicker">ANTES DE COMENZAR</p><h2 id="intro-title">${x.title}</h2><p>${x.role}</p><p class="focus">${x.focus}</p><h3>Cómo jugar</h3><ol>${x.steps.map(s=>`<li>${s}</li>`).join('')}</ol><button id="intro-start">Comprendido, comenzar la historia</button>`;
+  document.body.appendChild(dialog);
+  dialog.querySelector('#intro-start').addEventListener('click',()=>{dialog.close();dialog.remove();question();});
+  dialog.addEventListener('cancel',()=>dialog.remove());dialog.showModal();
+}
+
+load();landing();
