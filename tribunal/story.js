@@ -3,6 +3,7 @@
 // porque no pudieron verificarse en fuente oficial durante la elaboración: ver «Pendientes de revisión académica» en el README.
 const o=(text,score,why,effect,fx,ev,p)=>{const r={text,score,why,effect,fx,ev,p};Object.defineProperty(r,'t',{value(k){this.to=k;return this;}});return r;};
 window.GAME={
+formGame:'Tribunal de decisiones éticas',
 id:'ethics',title:'Tribunal de decisiones éticas',icon:'⚖',subtitle:'El criterio se construye',
 alt:'Practicante y supervisora que revisan un caso con reserva',minutes:'35–50 minutos',
 intro:'Un relato sensible. Principios en tensión. Diez decisiones para cuidar los derechos y fundamentar tu actuación profesional.',

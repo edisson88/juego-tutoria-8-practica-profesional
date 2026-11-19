@@ -2,6 +2,8 @@
 // Se guarda solo el historial de decisiones; puntos, variables, escena y progreso se derivan de la historia.
 const G=window.GAME,N=G.chapters.length,PER=100,MAX=N*PER,LOW=70,VMAX=6,MIN_CH=40,MIN_WORDS=8;
 const saveKey='tutoria8-'+G.id+'-v2',oldKey='tutoria8-'+G.id+'-visual-v1';
+const pKey='tutoria8-participante-v1',allSaves=['tutoria8-lead-v2','tutoria8-ethics-v2'];
+const FORM='https://docs.google.com/forms/d/e/1FAIpQLSfUYo58e8fMjlhdR762tpEGVQZjN-wKzzKZtreWi7ieMKs9_w/formResponse';
 const main=document.getElementById('main');
 document.title=G.title;document.getElementById('brand-title').textContent=G.title;document.getElementById('brand-icon').textContent=G.icon;
 let storageWorks=true,run=null,d=null,incompatible=false;
@@ -40,14 +42,41 @@ const count=()=>d?d.items.filter(x=>x.h.collected).length:0;
 function header(){document.getElementById('xp').textContent='★ '+(d?.score||0)+' XP';document.getElementById('seals').textContent=count()+'/'+N+' sellos';}
 function view(html){main.innerHTML=html+'<p class="footer">Tutoría 8 · Psicología · Experiencia formativa. Los personajes y situaciones adicionales son ficticios.</p>';header();window.scrollTo({top:0,behavior:'instant'});main.focus({preventScroll:true});}
 function stamps(){return `<div class="stamp-grid">${G.seals.map((s,i)=>{const e=d?.items[i]?.h.collected;return `<div class="stamp ${e?'earned':''}"><b aria-hidden="true">${e?G.symbols[i]:'◇'}</b>${s}<span>${e?'Sello reunido':'Por descubrir'}</span></div>`;}).join('')}</div>`;}
-function credential(full=false){return `<div class="${full?'credential':'credential-preview'}"><p class="kicker">${full?'Credencial simbólica de aprendizaje':'Tu recompensa final'}</p><h${full?'2':'3'}>${G.credential}</h${full?'2':'3'}><p>${count()}/${N} sellos reunidos</p>${full?stamps():'<p class="muted">Cada capítulo añade una pieza a tu credencial.</p>'}${full?'<small>Recorrido completado · Tutoría 8 · Prácticas Profesionales de Psicología</small><small>Reconocimiento del proceso de aprendizaje. No certifica competencias ni habilita el ejercicio profesional.</small>':''}</div>`;}
+function credential(full=false){return `<div class="${full?'credential':'credential-preview'}"><p class="kicker">${full?'Credencial simbólica de aprendizaje':'Tu recompensa final'}</p><h${full?'2':'3'}>${G.credential}</h${full?'2':'3'}>${full&&participant()?`<p><strong>${esc(participant().name)}</strong><br>Documento: ${esc(participant().doc)}</p>`:''}<p>${count()}/${N} sellos reunidos</p>${full?stamps():'<p class="muted">Cada capítulo añade una pieza a tu credencial.</p>'}${full?'<small>Recorrido completado · Tutoría 8 · Prácticas Profesionales de Psicología</small><small>Reconocimiento del proceso de aprendizaje. No certifica competencias ni habilita el ejercicio profesional.</small>':''}</div>`;}
 function meters(){const st=d?.st||G.vars;return `<div class="meters"><p class="kicker">Recursos de la simulación</p>${Object.entries(G.varLabels).map(([k,l])=>`<div class="meter"><span>${l}</span><b aria-label="${st[k]} de ${VMAX}">${'●'.repeat(st[k])}${'○'.repeat(VMAX-st[k])}</b></div>`).join('')}<small>Recursos ficticios del juego; no miden a personas ni son una medición psicológica.</small></div>`;}
 
 function landing(){
   const active=run?.history.length>0;
-  view(`${incompatible?`<section class="panel notice" role="alert"><h2>Partida anterior no compatible</h2><p>Este navegador guarda una partida de una versión anterior (tres capítulos) o con datos que no coinciden con la versión actual de ${N} capítulos. No se ha borrado nada, pero no se puede continuar.</p><div class="buttons"><button onclick="confirmRestart()">Empezar una nueva partida</button></div></section>`:''}<section class="panel hero"><img src="scene.png" alt="${esc(G.alt)}"><div class="hero-copy"><p class="kicker">Una historia. Tu propio recorrido.</p><h1>${G.subtitle}</h1><p>${G.intro}</p><div class="buttons"><button onclick="begin()">${active?'Continuar mi partida':'Aceptar la misión'} →</button><button class="secondary" onclick="dashboard()">Explorar mi ruta</button></div><p><small>${N} capítulos · decisiones ramificadas · ${N} sellos · duración estimada ${G.minutes} (por confirmar con pilotaje)</small></p></div></section><section class="panel intro-strip"><div><p class="kicker">Un propósito compartido</p><h2>${G.title}</h2><p>${G.guide}</p></div><div class="strip-cred">${credential()}</div></section>`);
+  view(`${incompatible?`<section class="panel notice" role="alert"><h2>Partida anterior no compatible</h2><p>Este navegador guarda una partida de una versión anterior (tres capítulos) o con datos que no coinciden con la versión actual de ${N} capítulos. No se ha borrado nada, pero no se puede continuar.</p><div class="buttons"><button onclick="confirmRestart()">Empezar una nueva partida</button></div></section>`:''}<section class="panel hero"><img src="scene.png" alt="${esc(G.alt)}"><div class="hero-copy"><p class="kicker">Una historia. Tu propio recorrido.</p><h1>${G.subtitle}</h1><p>${G.intro}</p><div class="buttons"><button onclick="begin()">${active?'Continuar mi partida':'Aceptar la misión'} →</button><button class="secondary" onclick="dashboard()">Explorar mi ruta</button>${participant()?`<button class="secondary" onclick="askParticipant(true)">Cambiar participante</button>`:''}</div><p><small>${N} capítulos · decisiones ramificadas · ${N} sellos · duración estimada ${G.minutes} (por confirmar con pilotaje)</small></p></div></section><section class="panel intro-strip"><div><p class="kicker">Un propósito compartido</p><h2>${G.title}</h2><p>${G.guide}</p></div><div class="strip-cred">${credential()}</div></section>`);
 }
-function begin(){if(incompatible){confirmRestart();return;}if(!run)fresh();if(run.history.length){dashboard();return;}showIntroduction();}
+/* ---------- participante (nombre y documento; solo en este navegador, compartido por ambos juegos) ---------- */
+function participant(){try{const p=JSON.parse(localStorage.getItem(pKey));return p&&p.name&&p.doc?p:null;}catch{return null;}}
+function askParticipant(change,then){
+  document.getElementById('participant')?.remove();
+  const cur=participant(),dialog=document.createElement('dialog');dialog.id='participant';dialog.setAttribute('aria-labelledby','part-title');
+  dialog.innerHTML=`<p class="kicker">${change?'Cambiar participante':'Antes de comenzar'}</p><h2 id="part-title">Tus datos de participación</h2><p>Escribe tu nombre y tu número de documento de identidad. Se guardan en este navegador, para que no tengas que escribirlos otra vez, y se envían al formulario de pre-registro de la docente de Tutoría 8.</p>${change?'<p class="notice"><strong>Atención:</strong> al guardar datos nuevos se borrarán las partidas guardadas en este navegador para empezar de cero con el nuevo participante.</p>':''}<form id="part-form" novalidate><label for="part-name"><strong>Nombre completo</strong></label><input id="part-name" autocomplete="name" maxlength="80" required style="width:100%;margin:6px 0 14px;padding:10px;font:inherit;border:1.5px solid var(--line);border-radius:10px"><label for="part-doc"><strong>Número de documento de identidad</strong></label><input id="part-doc" inputmode="text" autocomplete="off" maxlength="20" required style="width:100%;margin:6px 0 6px;padding:10px;font:inherit;border:1.5px solid var(--line);border-radius:10px"><p id="part-err" role="alert" style="color:#a33;font-size:14px;min-height:20px;margin:4px 0 10px"></p><div class="buttons"><button type="submit">Guardar y continuar</button>${change?'<button type="button" class="secondary" id="part-cancel">Cancelar</button>':''}</div></form>`;
+  document.body.appendChild(dialog);
+  const name=dialog.querySelector('#part-name'),doc=dialog.querySelector('#part-doc'),err=dialog.querySelector('#part-err');
+  if(cur&&!change){name.value=cur.name;doc.value=cur.doc;}
+  dialog.querySelector('#part-form').addEventListener('submit',e=>{e.preventDefault();
+    const n=name.value.trim().replace(/\s+/g,' '),dc=doc.value.replace(/[\s.\-]/g,'');
+    if(n.length<5||!/\p{L}/u.test(n)){err.textContent='Escribe tu nombre completo (mínimo 5 caracteres).';name.focus();return;}
+    if(!/^[0-9A-Za-z]{5,15}$/.test(dc)){err.textContent='El documento debe tener entre 5 y 15 letras o números, sin símbolos.';doc.focus();return;}
+    try{if(change)allSaves.forEach(k=>localStorage.removeItem(k));localStorage.setItem(pKey,JSON.stringify({name:n,doc:dc,sent:{}}));}catch{err.textContent='Este navegador no permite guardar datos; podrás jugar, pero tendrás que escribirlos de nuevo.';}
+    if(change){run=null;d=null;incompatible=false;}
+    dialog.close();dialog.remove();then?then():landing();});
+  const cancel=dialog.querySelector('#part-cancel');if(cancel)cancel.addEventListener('click',()=>{dialog.close();dialog.remove();});
+  dialog.addEventListener('cancel',e=>{if(!change)e.preventDefault();else dialog.remove();});
+  dialog.showModal();name.focus();
+}
+/* Pre-registro: envía el juego, nombre y documento al Google Form una vez por juego. Con no-cors la respuesta es opaca: solo se sabe si hubo error de red. */
+let sending=false;
+function register(){
+  const p=participant();if(!p||p.sent?.[G.id]||sending||typeof fetch!=='function')return;sending=true;
+  const body=new URLSearchParams({'entry.1876723815':G.formGame,'entry.1609183475':p.name,'entry.2035151280':p.doc});
+  fetch(FORM,{method:'POST',mode:'no-cors',body}).then(()=>{const q=participant();if(!q||q.doc!==p.doc)return;q.sent={...q.sent,[G.id]:1};try{localStorage.setItem(pKey,JSON.stringify(q));}catch{}}).catch(()=>{}).finally(()=>{sending=false;});
+}
+function begin(){if(!participant()){askParticipant(false,begin);return;}register();if(incompatible){confirmRestart();return;}if(!run)fresh();if(run.history.length){dashboard();return;}showIntroduction();}
 function dashboard(){
   const items=d?.items||[],done=count(),ch=d?.ch||0;
   view(`<section class="panel"><p class="kicker">${G.journey}</p><h1 style="font-size:34px">Tu ruta de decisiones</h1><p>Cada capítulo se abre con las consecuencias de lo que elegiste. Reúne los ${N} sellos y construye tu credencial.</p><div class="grid">${G.chapters.map((c,i)=>{const it=items[i],collected=it?.h.collected,unclaimed=it&&!collected,current=d?(!d.done&&i===ch&&!unclaimed):i===0,locked=!it&&!current;

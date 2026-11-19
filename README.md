@@ -56,7 +56,11 @@ Abre `http://localhost:8000/`. También puedes usar Live Server de Visual Studio
 - El desenlace combina puntos, número de decisiones débiles, decisiones críticas (0 puntos), recuperación en los capítulos finales y el estado de las variables; no depende solo de la suma. El cierre relaciona el recorrido con las cuatro dimensiones del liderazgo transformacional (Líder) o con cuatro ejes de criterio ético (Tribunal) y propone acciones concretas. No diagnostica ni es una prueba validada.
 
 ### Capítulos de «Misión: líder transformacional»
-1 Abrir el diálogo · 2 Construir acuerdos · 3 Aprender juntos · 4 Equidad en las cargas · 5 Apertura al cambio · 6 Voces incluidas · 7 Integridad ante la presión · 8 Diálogo abierto · 9 Cuidado del equipo · 10 Huella sostenible.
+Los capítulos recorren cuatro ámbitos de la psicología; la confianza, la colaboración, la sobrecarga y los acuerdos se arrastran de un escenario al siguiente (el líder construye reputación).
+
+1 Comunitario · Abrir el diálogo · 2 Comunitario · Construir acuerdos · 3 Comunitario · Aprender juntos · 4 Educativo · Equidad en las cargas · 5 Clínico · Apertura al cambio · 6 Organizacional · Voces incluidas · 7 Educativo · Integridad ante la presión · 8 Clínico · Diálogo abierto · 9 Organizacional · Cuidado del equipo · 10 Cierre integrador · Huella sostenible.
+
+Los casos son ficticios; los escenarios clínico, educativo y organizacional tratan solo dinámica de equipo y no incluyen técnicas de intervención ni datos de personas reales. Pendiente de revisión por la docente.
 
 ### Capítulos de «Tribunal de decisiones éticas»
 1 Recibir el relato · 2 Deliberar con criterio · 3 Fundamentar la actuación · 4 Información e incertidumbre · 5 Consulta supervisada · 6 Destinatarios de la información · 7 Documentar · 8 Comunicación con el adolescente · 9 Integridad institucional · 10 Seguimiento y revisión.
@@ -81,7 +85,7 @@ El Tribunal distingue los hechos originales del caso (panel «Hechos originales 
 
 ## Datos y condiciones de uso
 
-El proyecto no incluye servicios de autenticación, analítica ni envío de información. Las reflexiones y la partida se conservan en `localStorage`, en ese navegador y dispositivo; no se envían a la docente. No incluyas datos personales reales. Borrar los datos del navegador o reiniciar elimina ese avance.
+El proyecto no incluye servicios de autenticación, analítica ni envío de información. Las reflexiones y la partida se conservan en `localStorage`, en ese navegador y dispositivo; no se envían a la docente. El nombre y el documento del participante son la excepción: se piden una sola vez (clave `tutoria8-participante-v1`, compartida por ambos juegos), aparecen en la credencial y se envían al Google Form de pre-registro (una vez por juego, con el juego elegido). El envío usa `mode:'no-cors'`, así que la página no puede confirmar que el Form lo recibió; hay que revisar las respuestas del Form. Los puntajes y reflexiones siguen sin enviarse. Pendiente: confirmar con la universidad el tratamiento de datos personales (documento de identidad). No incluyas datos personales reales. Borrar los datos del navegador o reiniciar elimina ese avance.
 
 Las situaciones son ficticias y la credencial es simbólica, no una certificación profesional. El juego no sustituye la valoración ni el acompañamiento profesional. La capacidad para 400 participantes simultáneos no ha sido validada con una prueba de carga.
 

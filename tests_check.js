@@ -4,16 +4,29 @@ function mkEnv(dir,store){
   const els={};const el=id=>els[id]||(els[id]={id,innerHTML:'',textContent:'',dataset:{},open:false,classList:{add(){}},style:{},showModal(){this.open=true},close(){this.open=false},remove(){},querySelector(){return el('q')},querySelectorAll(){return[]},addEventListener(){},appendChild(){},focus(){},scrollIntoView(){},setAttribute(){},value:''});
   const doc={getElementById:el,querySelectorAll(){return[]},body:{dataset:{game:dir==='lider'?'lead':'ethics'},appendChild(){}},createElement:()=>el('c'+Math.random()),title:''};
   const ls={getItem:k=>k in store?store[k]:null,setItem:(k,v)=>{store[k]=String(v)},removeItem:k=>{delete store[k]}};
-  const win={scrollTo(){}};const ctx={window:win,document:doc,localStorage:ls,Math,JSON,console,print(){}};win.window=win;
+  const win={scrollTo(){}};const calls=[];const ctx={URLSearchParams,window:win,document:doc,localStorage:ls,Math,JSON,console,print(){},fetch:(u,o)=>{calls.push({u,b:String(o.body)});return Promise.resolve();},calls};win.window=win;
   vm.createContext(ctx);
   vm.runInContext(fs.readFileSync(dir+'/story.js','utf8'),ctx);
   // game.js usa const/let de nivel superior: se añade al final un acceso para pruebas
-  vm.runInContext(fs.readFileSync(dir+'/game.js','utf8')+';this.__t={get run(){return run},get d(){return d},get incompat(){return incompatible},derive,answer,claimSeal,revealReward,fresh,load,validReflection,needsReflection,N,G,finish,outcome};',ctx);
-  return ctx.__t;
+  vm.runInContext(fs.readFileSync(dir+'/game.js','utf8')+';this.__t={get run(){return run},get d(){return d},get incompat(){return incompatible},derive,answer,claimSeal,participant,begin,register,revealReward,fresh,load,validReflection,needsReflection,N,G,finish,outcome};',ctx);
+  ctx.__t.calls=calls;return ctx.__t;
 }
 for(const dir of ['lider','tribunal']){
   const store={};const T=mkEnv(dir,store),G=T.G,N=T.N;
   assert.strictEqual(N,10);
+  // ---- participante: sin datos begin() pide el popup y no inicia partida; con datos guardados se reutilizan ----
+  assert.strictEqual(T.participant(),null);T.begin();assert.strictEqual(T.run,null,'begin sin participante no debe iniciar partida');
+  store['tutoria8-participante-v1']=JSON.stringify({name:'Ana Pérez',doc:'1234567'});
+  assert.deepStrictEqual({...T.participant()},{name:'Ana Pérez',doc:'1234567'});
+  store['tutoria8-participante-v1']='{roto';assert.strictEqual(T.participant(),null);delete store['tutoria8-participante-v1'];
+  // ---- pre-registro: se envía una sola vez por juego, con los campos exactos del Google Form ----
+  store['tutoria8-participante-v1']=JSON.stringify({name:'Ana Pérez',doc:'1234567',sent:{}});
+  T.register();T.register();
+  assert.strictEqual(T.calls.length,1,'doble llamada inmediata debe enviar una sola vez');
+  const call=T.calls[0];assert(call.u.endsWith('/formResponse'));
+  const q=new URLSearchParams(call.b);assert.strictEqual(q.get('entry.1876723815'),G.formGame);assert.strictEqual(q.get('entry.1609183475'),'Ana Pérez');assert.strictEqual(q.get('entry.2035151280'),'1234567');
+  assert(['Líder transformacional','Tribunal de decisiones éticas'].includes(G.formGame));
+  delete store['tutoria8-participante-v1'];
   // ---- grafo: recorrer todas las rutas (3^10) ----
   const reached=new Set();let paths=0,maxScore=0,minScore=1e9;const endings={};
   (function walk(ch,st,prev,score,low){
